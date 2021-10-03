@@ -3,8 +3,10 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
+import logging  # TODO(pbelevich): DELETE IT!
 import math
 from typing import Any, Dict, List, Optional
+from tqdm import tqdm  # TODO(pbelevich): DELETE IT!
 
 import torch
 import torch.nn as nn
@@ -26,6 +28,7 @@ from fairseq.modules.checkpoint_activations import checkpoint_wrapper
 from fairseq.modules.quant_noise import quant_noise as apply_quant_noise_
 from torch import Tensor
 
+logger = logging.getLogger(__name__)  # TODO(pbelevich): DELETE IT!
 
 # rewrite name for backward compatibility in `make_generation_fast_`
 def module_name_fordropout(module_name: str) -> str:
@@ -117,7 +120,7 @@ class TransformerDecoderBase(FairseqIncrementalDecoder):
         self.layers.extend(
             [
                 self.build_decoder_layer(cfg, no_encoder_attn)
-                for _ in range(cfg.decoder.layers)
+                for _ in tqdm(range(cfg.decoder.layers))  # TODO(pbelevich): DELETE IT!
             ]
         )
         self.num_layers = len(self.layers)
@@ -137,6 +140,8 @@ class TransformerDecoderBase(FairseqIncrementalDecoder):
         self.output_projection = output_projection
         if self.output_projection is None:
             self.build_output_projection(cfg, dictionary, embed_tokens)
+
+        self.embed_tokens = fsdp_wrap(self.embed_tokens, min_num_params=0)
 
     def build_output_projection(self, cfg, dictionary, embed_tokens):
         if cfg.adaptive_softmax_cutoff is not None:
@@ -164,6 +169,7 @@ class TransformerDecoderBase(FairseqIncrementalDecoder):
                 self.output_projection.weight, mean=0, std=self.output_embed_dim ** -0.5
             )
         num_base_layers = cfg.base_layers
+        self.output_projection = fsdp_wrap(self.output_projection, min_num_params=0)
         for i in range(num_base_layers):
             self.layers.insert(
                 ((i + 1) * cfg.decoder.layers) // (num_base_layers + 1),
@@ -178,8 +184,8 @@ class TransformerDecoderBase(FairseqIncrementalDecoder):
             layer = checkpoint_wrapper(layer, offload_to_cpu=offload_to_cpu)
         # if we are checkpointing, enforce that FSDP always wraps the
         # checkpointed layer, regardless of layer size
-        min_params_to_wrap = cfg.min_params_to_wrap if not checkpoint else 0
-        layer = fsdp_wrap(layer, min_num_params=min_params_to_wrap)
+        # min_params_to_wrap = cfg.min_params_to_wrap if not checkpoint else 0
+        # layer = fsdp_wrap(layer, min_num_params=min_params_to_wrap)
         return layer
 
     def forward(
@@ -337,6 +343,7 @@ class TransformerDecoderBase(FairseqIncrementalDecoder):
             else:
                 self_attn_mask = None
 
+            logger.info(f"[Decoder {idx}] Before forward")    # TODO(pbelevich): DELETE IT!
             x, layer_attn, _ = layer(
                 x,
                 enc,
@@ -347,6 +354,7 @@ class TransformerDecoderBase(FairseqIncrementalDecoder):
                 need_attn=bool((idx == alignment_layer)),
                 need_head_weights=bool((idx == alignment_layer)),
             )
+            logger.info(f"[Decoder {idx}] After forward")  # TODO(pbelevich): DELETE IT!
             inner_states.append(x)
             if layer_attn is not None and idx == alignment_layer:
                 attn = layer_attn.float().to(x)

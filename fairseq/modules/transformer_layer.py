@@ -8,6 +8,7 @@ from typing import Dict, List, Optional
 import torch
 import torch.nn as nn
 from fairseq import utils
+from fairseq.distributed import fsdp_wrap
 from fairseq.modules import LayerNorm, MultiheadAttention
 from fairseq.modules.fairseq_dropout import FairseqDropout
 from fairseq.modules.quant_noise import quant_noise
@@ -207,12 +208,12 @@ class TransformerDecoderLayerBase(nn.Module):
 
         self.cross_self_attention = cfg.cross_self_attention
 
-        self.self_attn = self.build_self_attention(
+        self.self_attn = fsdp_wrap(self.build_self_attention(
             self.embed_dim,
             cfg,
             add_bias_kv=add_bias_kv,
             add_zero_attn=add_zero_attn,
-        )
+        ), min_num_params=0)
         self.attn_ln = LayerNorm(self.embed_dim) if utils.safe_getattr(cfg, 'scale_attn', False) else None
         self.nh = self.self_attn.num_heads
         self.head_dim = self.self_attn.head_dim
@@ -229,7 +230,7 @@ class TransformerDecoderLayerBase(nn.Module):
         )
         self.normalize_before = cfg.decoder.normalize_before
 
-        self.self_attn_layer_norm = LayerNorm(self.embed_dim, export=cfg.export)
+        self.self_attn_layer_norm = fsdp_wrap(LayerNorm(self.embed_dim, export=cfg.export), min_num_params=0)
 
         if no_encoder_attn:
             self.encoder_attn = None
@@ -241,29 +242,31 @@ class TransformerDecoderLayerBase(nn.Module):
         self.ffn_layernorm = LayerNorm(cfg.decoder.ffn_embed_dim) if utils.safe_getattr(cfg, 'scale_fc', False) else None
         self.w_resid = nn.Parameter(torch.ones(self.embed_dim, ), requires_grad=True) if utils.safe_getattr(cfg, 'scale_resids', False) else None
 
-        self.fc1 = self.build_fc1(
+        self.fc1 = fsdp_wrap(self.build_fc1(
             self.embed_dim,
             cfg.decoder.ffn_embed_dim,
             self.quant_noise,
             self.quant_noise_block_size,
-        )
-        self.fc2 = self.build_fc2(
+        ), min_num_params=0)
+        self.fc2 = fsdp_wrap(self.build_fc2(
             cfg.decoder.ffn_embed_dim,
             self.embed_dim,
             self.quant_noise,
             self.quant_noise_block_size,
-        )
+        ), min_num_params=0)
 
-        self.final_layer_norm = LayerNorm(self.embed_dim, export=cfg.export)
+        self.final_layer_norm = fsdp_wrap(LayerNorm(self.embed_dim, export=cfg.export), min_num_params=0)
         self.need_attn = True
 
         self.onnx_trace = False
 
     def build_fc1(self, input_dim, output_dim, q_noise, qn_block_size):
-        return quant_noise(nn.Linear(input_dim, output_dim), q_noise, qn_block_size)
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        return quant_noise(nn.Linear(input_dim, output_dim, device=device).cpu(), q_noise, qn_block_size)
 
     def build_fc2(self, input_dim, output_dim, q_noise, qn_block_size):
-        return quant_noise(nn.Linear(input_dim, output_dim), q_noise, qn_block_size)
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        return quant_noise(nn.Linear(input_dim, output_dim, device=device).cpu(), q_noise, qn_block_size)
 
     def build_self_attention(
         self, embed_dim, cfg, add_bias_kv=False, add_zero_attn=False

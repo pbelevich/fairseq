@@ -186,13 +186,17 @@ class LanguageModelingTask(LegacyFairseqTask):
         return cls(args, dictionary, output_dictionary, targets=targets)
 
     def build_model(self, args):
+        import time  # TODO(pbelevich): DELETE IT!
+        logger.info("Starting building model")  # TODO(pbelevich): DELETE IT!
+        start = time.time()  # TODO(pbelevich): DELETE IT!
         model = super().build_model(args)
+        end = time.time()  # TODO(pbelevich): DELETE IT!
         for target in self.targets:
             if target not in model.supported_targets:
                 raise ValueError(
                     "Unsupported language modeling target: {}".format(target)
                 )
-
+        logger.info(f"Finished building model in {end - start} seconds")  # TODO(pbelevich): DELETE IT!
         return model
 
     def load_dataset(
