@@ -90,11 +90,12 @@ def main(cfg: FairseqConfig) -> None:
     assert cfg.criterion, "Please specify criterion to train a model"
 
     # Build model and criterion
-    if cfg.distributed_training.ddp_backend == "fully_sharded":
-        with fsdp_enable_wrap(cfg.distributed_training):
-            model = fsdp_wrap(task.build_model(cfg.model))
-    else:
-        model = task.build_model(cfg.model)
+    with torch.profiler.record_function("build_model"):
+        if cfg.distributed_training.ddp_backend == "fully_sharded":
+            with fsdp_enable_wrap(cfg.distributed_training):
+                model = fsdp_wrap(task.build_model(cfg.model))
+        else:
+            model = task.build_model(cfg.model)
     criterion = task.build_criterion(cfg.criterion)
     logger.info(model)
     logger.info("task: {}".format(task.__class__.__name__))
@@ -285,7 +286,7 @@ def train(
     num_updates = trainer.get_num_updates()
     logger.info("Start iterating over samples")
     for i, samples in enumerate(progress):
-        with metrics.aggregate("train_inner"), torch.autograd.profiler.record_function(
+        with metrics.aggregate("train_inner"), torch.profiler.record_function(
             "train_step-%d" % i
         ):
             log_output = trainer.train_step(samples)
@@ -499,12 +500,7 @@ def cli_main(
         server = PlasmaStore(path=cfg.common.plasma_path)
         logger.info(f"Started plasma server pid {server.server.pid} {cfg.common.plasma_path}")
 
-    if args.profile:
-        with torch.cuda.profiler.profile():
-            with torch.autograd.profiler.emit_nvtx():
-                distributed_utils.call_main(cfg, main)
-    else:
-        distributed_utils.call_main(cfg, main)
+    distributed_utils.call_main(cfg, main)
 
     # if cfg.common.use_plasma_view:
     #     server.server.kill()

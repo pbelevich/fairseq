@@ -271,7 +271,9 @@ def distributed_init(cfg: FairseqConfig):
 
             # perform a dummy all-reduce to initialize the NCCL communicator
             if torch.cuda.is_available():
-                dist.all_reduce(torch.zeros(1).cuda())
+                logger.info("Before a dummy all-reduce to initialize the NCCL communicator")  # TODO(pbelevich): DELETE IT!
+                dist.all_reduce(torch.zeros(1, device="cuda"))
+                logger.info("After a dummy all-reduce to initialize the NCCL communicator")  # TODO(pbelevich): DELETE IT!
 
         cfg.distributed_training.distributed_rank = torch.distributed.get_rank()
     else:
@@ -325,7 +327,20 @@ def distributed_main(i, main, cfg: FairseqConfig, kwargs):
     if after_distributed_init_fn:
         cfg = after_distributed_init_fn(cfg)
 
-    main(cfg, **kwargs)
+    logger.info("Starting main")  # TODO(pbelevich): DELETE IT!
+    if cfg.common.profile:
+        from datetime import datetime
+        now = datetime.now()
+        from torch.profiler import profile, tensorboard_trace_handler, ProfilerActivity
+        with profile(
+            activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
+            record_shapes=True,
+            with_stack=True,
+            with_flops=True,
+            on_trace_ready=tensorboard_trace_handler(f"tb/{now.strftime('%Y_%m_%d_%H_%M_%S')}"),
+        ):
+            main(cfg, **kwargs)
+    logger.info("Finished main")  # TODO(pbelevich): DELETE IT!
 
     if torch.distributed.is_initialized():
         torch.distributed.barrier(get_global_group())
