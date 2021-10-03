@@ -62,18 +62,20 @@ class MultiheadAttention(nn.Module):
             "Self-attention requires query, key and " "value to be of the same size"
         )
 
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
         self.k_proj = quant_noise(
-            nn.Linear(self.kdim, embed_dim, bias=bias), q_noise, qn_block_size
+            nn.Linear(self.kdim, embed_dim, bias=bias, device=self.device), q_noise, qn_block_size
         )
         self.v_proj = quant_noise(
-            nn.Linear(self.vdim, embed_dim, bias=bias), q_noise, qn_block_size
+            nn.Linear(self.vdim, embed_dim, bias=bias, device=self.device), q_noise, qn_block_size
         )
         self.q_proj = quant_noise(
-            nn.Linear(embed_dim, embed_dim, bias=bias), q_noise, qn_block_size
+            nn.Linear(embed_dim, embed_dim, bias=bias, device=self.device), q_noise, qn_block_size
         )
 
         self.out_proj = quant_noise(
-            nn.Linear(embed_dim, embed_dim, bias=bias), q_noise, qn_block_size
+            nn.Linear(embed_dim, embed_dim, bias=bias, device=self.device), q_noise, qn_block_size
         )
 
         if add_bias_kv:
@@ -92,6 +94,9 @@ class MultiheadAttention(nn.Module):
         self.onnx_trace = True
 
     def reset_parameters(self):
+        self.k_proj = self.k_proj.to(self.device)
+        self.v_proj = self.v_proj.to(self.device)
+        self.q_proj = self.q_proj.to(self.device)
         if self.qkv_same_dim:
             # Empirically observed the convergence to be much better with
             # the scaled initialization
@@ -102,14 +107,23 @@ class MultiheadAttention(nn.Module):
             nn.init.xavier_uniform_(self.k_proj.weight)
             nn.init.xavier_uniform_(self.v_proj.weight)
             nn.init.xavier_uniform_(self.q_proj.weight)
+        self.k_proj = self.k_proj.cpu()
+        self.v_proj = self.v_proj.cpu()
+        self.q_proj = self.q_proj.cpu()
 
+        self.out_proj = self.out_proj.to(self.device)
         nn.init.xavier_uniform_(self.out_proj.weight)
         if self.out_proj.bias is not None:
             nn.init.constant_(self.out_proj.bias, 0.0)
+        self.out_proj = self.out_proj.cpu()
         if self.bias_k is not None:
+            self.bias_k = self.bias_k.to(self.device)
             nn.init.xavier_normal_(self.bias_k)
+            self.bias_k = self.bias_k.cpu()
         if self.bias_v is not None:
+            self.bias_v = self.bias_v.to(self.device)
             nn.init.xavier_normal_(self.bias_v)
+            self.bias_v = self.bias_v.cpu()
 
     def forward(
         self,
