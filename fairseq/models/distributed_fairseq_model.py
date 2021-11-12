@@ -121,7 +121,7 @@ def DistributedFairseqModel(args, model, process_group, device):
         wrapped_model = ModuleProxyWrapper(wrapped_model)
     elif args.ddp_backend == "fully_sharded":
         try:
-            from fairscale.nn.data_parallel import FullyShardedDataParallel as FSDP
+            from torch.distributed._fsdp import FullyShardedDataParallel as FSDP
         except ImportError:
             raise ImportError(
                 "Cannot find FullyShardedDataParallel. "

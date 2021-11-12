@@ -107,23 +107,17 @@ class MultiheadAttention(nn.Module):
             nn.init.xavier_uniform_(self.k_proj.weight)
             nn.init.xavier_uniform_(self.v_proj.weight)
             nn.init.xavier_uniform_(self.q_proj.weight)
-        self.k_proj = self.k_proj.cpu()
-        self.v_proj = self.v_proj.cpu()
-        self.q_proj = self.q_proj.cpu()
 
         self.out_proj = self.out_proj.to(self.device)
         nn.init.xavier_uniform_(self.out_proj.weight)
         if self.out_proj.bias is not None:
             nn.init.constant_(self.out_proj.bias, 0.0)
-        self.out_proj = self.out_proj.cpu()
         if self.bias_k is not None:
             self.bias_k = self.bias_k.to(self.device)
             nn.init.xavier_normal_(self.bias_k)
-            self.bias_k = self.bias_k.cpu()
         if self.bias_v is not None:
             self.bias_v = self.bias_v.to(self.device)
             nn.init.xavier_normal_(self.bias_v)
-            self.bias_v = self.bias_v.cpu()
 
     def forward(
         self,

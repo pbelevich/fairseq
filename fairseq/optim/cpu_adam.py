@@ -13,6 +13,8 @@ from fairseq.dataclass import FairseqDataclass
 from fairseq.optim import FairseqOptimizer, register_optimizer
 from omegaconf import II, DictConfig
 
+import logging
+logger = logging.getLogger(__name__)
 
 try:
     import deepspeed
@@ -160,7 +162,7 @@ class CPUAdam(torch.optim.Optimizer):
                 p_data_bak = p.data  # backup of the original data pointer
 
                 p.data = p.data.to(dtype=torch.float32, device="cpu")
-                p.grad.data = p.grad.data.to(dtype=torch.float32, device="cpu")
+                tmp_grad = p.grad.data.to(dtype=torch.float32, device="cpu")
 
                 if self.use_fp16_stats:
                     exp_avg = exp_avg.float() * state["exp_avg_scale"]
@@ -179,7 +181,7 @@ class CPUAdam(torch.optim.Optimizer):
                     group["weight_decay"],
                     group["bias_correction"],
                     p.data,
-                    p.grad.data,
+                    tmp_grad,
                     exp_avg,
                     exp_avg_sq,
                 )

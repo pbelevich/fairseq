@@ -12,7 +12,8 @@ from fairseq.distributed import utils as dist_utils
 
 
 try:
-    from fairscale.nn.data_parallel import FullyShardedDataParallel as FSDP
+    from torch.distributed._fsdp import FullyShardedDataParallel as FSDP
+    from torch.distributed._fsdp.fully_sharded_data_parallel import CPUOffload
 
     has_FSDP = True
 except ImportError:
@@ -50,36 +51,10 @@ class FullyShardedDataParallel(FSDP):
         else:
             return self.module
 
-    def state_dict(self, destination=None, prefix="", keep_vars=False):
-        if self.use_sharded_state:
-            return super().local_state_dict(
-                destination=destination, prefix=prefix, keep_vars=keep_vars
-            )
-        else:
-            if self.rank == 0:
-                return super().state_dict(
-                    destination=destination, prefix=prefix, keep_vars=keep_vars
-                )
-            else:
-                # We must call state_dict() due to use of communication
-                # primitives. But we don't use the result.
-                super().state_dict()
-                return destination or {}
-
-    def load_state_dict(self, state_dict, strict=True, model_cfg=None):
-        if self.use_sharded_state:
-            return super().load_local_state_dict(state_dict, strict=strict)
-        else:
-            state_dict = dist_utils.broadcast_object(
-                state_dict, src_rank=0, group=self.process_group
-            )
-            return super().load_state_dict(state_dict, strict=strict)
-
-
 @contextlib.contextmanager
 def fsdp_enable_wrap(cfg: DistributedTrainingConfig):
     try:
-        from fairscale.nn import enable_wrap
+        from torch.distributed._fsdp.wrap import enable_wrap
     except ImportError:
         raise ImportError(
             "Cannot find FullyShardedDataParallel. "
@@ -94,14 +69,7 @@ def fsdp_enable_wrap(cfg: DistributedTrainingConfig):
         group = DummyProcessGroup(rank=0, size=1)
     fsdp_config = {
         "process_group": group,
-        "reshard_after_forward": not cfg.no_reshard_after_forward,
-        "mixed_precision": cfg.fp16 and not cfg.memory_efficient_fp16,
-        "fp32_reduce_scatter": cfg.fp32_reduce_scatter,
-        "flatten_parameters": True,
-        "cpu_offload": cfg.cpu_offload,
-        "compute_dtype": torch.float16 if cfg.fp16 else torch.float32,
-        "bucket_cap_mb": cfg.bucket_cap_mb,
-        "state_dict_device": torch.device("cpu"),  # reduce GPU mem usage
+        "cpu_offload": CPUOffload(offload_params=True) if cfg.cpu_offload else CPUOffload(offload_params=False),
     }
     with enable_wrap(
         wrapper_cls=FullyShardedDataParallel,
@@ -121,7 +89,7 @@ def fsdp_wrap(module, min_num_params: Optional[int] = None, **kwargs):
         min_num_params (int, Optional): minimum number of layer params to wrap
     """
     try:
-        from fairscale.nn import wrap
+        from torch.distributed._fsdp.wrap import wrap
 
         if min_num_params is not None:
             num_params = sum(p.numel() for p in module.parameters())

@@ -343,7 +343,6 @@ class TransformerDecoderBase(FairseqIncrementalDecoder):
             else:
                 self_attn_mask = None
 
-            logger.info(f"[Decoder {idx}] Before forward")    # TODO(pbelevich): DELETE IT!
             x, layer_attn, _ = layer(
                 x,
                 enc,
@@ -354,7 +353,6 @@ class TransformerDecoderBase(FairseqIncrementalDecoder):
                 need_attn=bool((idx == alignment_layer)),
                 need_head_weights=bool((idx == alignment_layer)),
             )
-            logger.info(f"[Decoder {idx}] After forward")  # TODO(pbelevich): DELETE IT!
             inner_states.append(x)
             if layer_attn is not None and idx == alignment_layer:
                 attn = layer_attn.float().to(x)

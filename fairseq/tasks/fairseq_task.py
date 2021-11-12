@@ -487,17 +487,17 @@ class FairseqTask(object):
         """
         model.train()
         model.set_num_updates(update_num)
-        logger.info("Before global forward")  # TODO(pbelevich): DELETE IT!
+        logger.info("Before global forward") 
         with torch.profiler.record_function("forward"):
             with torch.cuda.amp.autocast(enabled=(isinstance(optimizer, AMPOptimizer))):
                 loss, sample_size, logging_output = criterion(model, sample)
-        logger.info("After global forward")  # TODO(pbelevich): DELETE IT!
+        logger.info("After global forward")
         if ignore_grad:
             loss *= 0
-        logger.info("Before global backward")  # TODO(pbelevich): DELETE IT!
+        logger.info("Before global backward")
         with torch.profiler.record_function("backward"):
             optimizer.backward(loss)
-        logger.info("After global backward")  # TODO(pbelevich): DELETE IT!
+        logger.info("After global backward")
         return loss, sample_size, logging_output
 
     def valid_step(self, sample, model, criterion):

@@ -262,11 +262,11 @@ class TransformerDecoderLayerBase(nn.Module):
 
     def build_fc1(self, input_dim, output_dim, q_noise, qn_block_size):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        return quant_noise(nn.Linear(input_dim, output_dim, device=device).cpu(), q_noise, qn_block_size)
+        return quant_noise(nn.Linear(input_dim, output_dim, device=device), q_noise, qn_block_size)
 
     def build_fc2(self, input_dim, output_dim, q_noise, qn_block_size):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        return quant_noise(nn.Linear(input_dim, output_dim, device=device).cpu(), q_noise, qn_block_size)
+        return quant_noise(nn.Linear(input_dim, output_dim, device=device), q_noise, qn_block_size)
 
     def build_self_attention(
         self, embed_dim, cfg, add_bias_kv=False, add_zero_attn=False

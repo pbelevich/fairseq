@@ -12,6 +12,8 @@ from omegaconf import DictConfig
 
 from .dynamic_loss_scaler import DynamicLossScaler
 
+import logging
+logger = logging.getLogger(__name__)
 
 class _FP16OptimizerMixin(object):
     def __init__(self, *args, **kwargs):
@@ -390,6 +392,7 @@ class _MemoryEfficientFP16OptimizerMixin(object):
         """
         if self.scaler is not None:
             loss = self.scaler.scale(loss)
+        logger.info(f"loss: {loss}")
         loss.backward()
 
     def _unscale_grads(self):
