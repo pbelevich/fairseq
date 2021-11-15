@@ -312,6 +312,16 @@ def distributed_init(cfg: FairseqConfig):
     return cfg.distributed_training.distributed_rank
 
 
+from torch.profiler import profile, tensorboard_trace_handler, ProfilerActivity
+
+
+def my_tensorboard_trace_handler(dir_name: str, rank, worker_name: Optional[str] = None, use_gzip: bool = False):
+    if rank < 3:
+        return tensorboard_trace_handler(dir_name, worker_name, use_gzip)
+    else:
+        return None
+
+
 def distributed_main(i, main, cfg: FairseqConfig, kwargs):
     cfg.distributed_training.device_id = i
     if torch.cuda.is_available() and not cfg.common.cpu and not cfg.common.tpu:
@@ -328,13 +338,12 @@ def distributed_main(i, main, cfg: FairseqConfig, kwargs):
     if cfg.common.profile:
         from datetime import datetime
         now = datetime.now()
-        from torch.profiler import profile, tensorboard_trace_handler, ProfilerActivity
         with profile(
             activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
             record_shapes=True,
             with_stack=True,
             with_flops=True,
-            on_trace_ready=tensorboard_trace_handler(f"tb/{now.strftime('%Y_%m_%d_%H_%M_%S')}"),
+            on_trace_ready=my_tensorboard_trace_handler(f"tb/{now.strftime('%Y_%m_%d_%H_%M_%S')}", cfg.distributed_training.distributed_rank, use_gzip=True),
         ):
             main(cfg, **kwargs)
     else:
