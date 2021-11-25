@@ -1008,6 +1008,20 @@ class Trainer(object):
             )
 
         metrics.log_stop_time("train_wall")
+        
+        def calc_tflops_per_gpu(meters):
+            B = meters["bsz"].smoothed_value
+            s = self.cfg.task.tokens_per_sample
+            h = self.cfg.model.decoder_embed_dim
+            l = self.cfg.model.decoder_layers
+            gpus = self.cfg.distributed_training.distributed_world_size
+            V = 50000
+            t = meters["train_wall"].smoothed_value
+            flop = 96*B*s*l*h*h*(1 + s/6/h + V/16/l/h)
+            return flop / t / gpus / 10**12
+
+        metrics.log_derived("tflop/gpu", calc_tflops_per_gpu)
+        
         return logging_output
 
     @metrics.aggregate("valid")
