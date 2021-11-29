@@ -159,7 +159,7 @@ class Trainer(object):
             self.cuda_env = None
             self.cuda_env_arr = None
 
-        metrics.log_start_time("wall", priority=790, round=0)
+        metrics.log_start_time("wall", priority=790, round=3)
 
         self._start_time = time.time()
         self._previous_training_time = 0
@@ -714,7 +714,7 @@ class Trainer(object):
         self.criterion.train()
         self.zero_grad()
 
-        metrics.log_start_time("train_wall", priority=800, round=0)
+        metrics.log_start_time("train_wall", priority=800, round=3)
 
         # If EMA is enabled through store_ema=True
         # and task.uses_ema is True, pass the EMA model as a keyword
